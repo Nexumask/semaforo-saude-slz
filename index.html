@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Semáforo da Saúde - São Luís</title>
     
-    <link rel="stylesheet" href="./Semáforo da Saúde - São Luís_files/leaflet.css">
+    <link rel="stylesheet" href="assets/leaflet.css">
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -124,10 +124,11 @@
             </div>
             <div class="auth-form">
                 <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 8px;">Para evitar relatos falsos, identifique-se antes de votar.</p>
-                <input type="email" id="auth-email" placeholder="Seu e-mail">
-                <input type="password" id="auth-password" placeholder="Sua senha (mínimo 6 dígitos)">
+                <input type="email" id="auth-email" placeholder="Seu e-mail" onkeypress="if(event.key === 'Enter') executarAutenticacao()">
+                <input type="password" id="auth-password" placeholder="Sua senha (mínimo 6 dígitos)" onkeypress="if(event.key === 'Enter') executarAutenticacao()">
                 <button class="btn-primary" id="btn-auth-submit" onclick="executarAutenticacao()">Entrar</button>
                 <div class="auth-toggle" id="auth-toggle-mode" onclick="alternarModoAuth()">Não tem conta? Cadastre-se aqui</div>
+                <div class="auth-toggle" style="margin-top: 8px;" onclick="resetarSenha()">Esqueci minha senha</div>
             </div>
         </div>
 
@@ -170,8 +171,8 @@
         </div>
     </div>
 
-    <script src="./Semáforo da Saúde - São Luís_files/leaflet.js.download"></script>
-    <script src="./Semáforo da Saúde - São Luís_files/supabase-js@2"></script>
+    <script src="assets/leaflet.js"></script>
+    <script src="assets/supabase.js"></script>
 
     <script>
         // ==========================================
@@ -270,6 +271,19 @@
         async function fazerLogout() { 
             if (_supabase) await _supabase.auth.signOut(); 
             location.reload(); 
+        }
+
+        async function resetarSenha() {
+            const email = prompt("Digite o e-mail cadastrado para receber o link de reset:");
+            if (!email) return;
+            
+            try {
+                const { error } = await _supabase.auth.resetPasswordForEmail(email);
+                if (error) throw error;
+                alert(`Link de recuperação enviado para ${email}`);
+            } catch (err) {
+                alert("Erro ao enviar e-mail: " + err.message);
+            }
         }
 
         // ==========================================
