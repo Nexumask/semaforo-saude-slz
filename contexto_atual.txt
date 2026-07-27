@@ -1,0 +1,27 @@
+Status atual do projeto:
+
+1. Autenticação:
+- Login nativo do Supabase (Email/Senha) está 100% funcional
+- Fluxos de cadastro, login e recuperação de senha operacionais
+
+2. Regras de ambiente:
+- Testes locais devem ser realizados exclusivamente via Live Server
+- É terminantemente proibido usar o comando start ou protocolo file://
+- Conexão com Supabase validada em ambiente local
+
+3. Progresso atual:
+- Página painel.html já criada e integrada ao Supabase
+- Funcionalidades implementadas:
+  * Formulário para atualização de notícias
+  * Integração com tabela 'footer_news' no Supabase
+  * Exibição automática no rodapé do index.html
+
+4. Próximos passos (quando retomar):
+- Verificar se a tabela 'footer_news' foi criada no Supabase
+- Testar fluxo completo de publicação/visualização
+- Documentar processo de deploy para produção
+
+Observações:
+- Ambiente de desenvolvimento configurado e funcional
+- Todos os arquivos estão no repositório local
+- Credenciais do Supabase configuradas no .env

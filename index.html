@@ -61,11 +61,34 @@
         #news-footer { height: 115px; background: #f8fafc; border-top: 2px solid #e2e8f0; display: flex; flex-direction: column; padding: 8px 12px; z-index: 1000; }
         .news-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .news-header h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444; }
-        .news-ticker-container { flex: 1; overflow-x: auto; display: flex; gap: 12px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+        .news-ticker-container { 
+            flex: 1; 
+            overflow: hidden;
+            position: relative;
+            height: 100%;
+        }
+        .news-item {
+            position: absolute;
+            width: 100%;
+            transition: transform 0.5s ease, opacity 0.5s ease;
+        }
+        .news-item.active {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .news-item.next {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        .news-item.prev {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
         .news-ticker-container::-webkit-scrollbar { display: none; }
         .news-item { min-width: 85%; background: white; padding: 8px 10px; border-radius: 6px; border: 1px solid #e2e8f0; scroll-snap-align: start; display: flex; flex-direction: column; justify-content: center; }
-        .news-text { font-size: 0.75rem; color: #334155; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .news-source { font-size: 0.6rem; color: #94a3b8; margin-top: 2px; text-transform: uppercase; }
+        .news-text { font-size: 1rem; color: #334155; font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .news-source { font-size: 0.8rem; color: #94a3b8; margin-top: 4px; text-transform: uppercase; }
+        #news-footer { height: 130px; }
 
         /* POPUPS DO MAPA */
         .popup-content { min-width: 180px; }
@@ -136,6 +159,7 @@
             <h1>🚦 Semáforo da Saúde</h1>
             <div id="user-area">
                 <span class="user-badge" id="user-status"><button class="btn-vote btn-verde" style="padding: 4px 10px;" onclick="abrirAuthModal()">Fazer Login</button></span>
+                <button class="btn-vote btn-amarelo" style="padding: 4px 10px; margin-left: 8px;" onclick="abrirPainelAdmin()">Painel Admin</button>
             </div>
         </div>
 
@@ -152,27 +176,49 @@
             <div class="news-header">
                 <h4>🚨 Plantão da Saúde - São Luís</h4>
             </div>
-            <div class="news-ticker-container" id="news-container"><div class="news-item" style="cursor: pointer;"><p class="news-text">Atendimento na UPA da Zona Rural apresenta fluxo normalizado nesta tarde.</p><span class="news-source">Fonte: Semsa</span></div><div class="news-item" style="cursor: pointer;"><p class="news-text">Hospital Carlos Macieira capacita médicos em cirurgia moderna da próstata.</p><span class="news-source">Fonte: Plantão SLZ</span><div style="margin-top: 8px; display: flex; align-items: center; gap: 10px; background: rgb(248, 250, 252); padding: 6px; border-radius: 8px; border: 1px solid rgb(226, 232, 240);">
-                                <img src="./Semáforo da Saúde - São Luís_files/hqdefault.jpg" style="width: 70px; height: 45px; object-fit: cover; border-radius: 6px;">
-                                <div style="display: flex; flex-direction: column;">
-                                    <span style="color:#ef4444; font-size:0.60rem; font-weight: 800; text-transform: uppercase;">Mídia Disponível</span>
-                                    <strong style="color:#0f172a; font-size:0.75rem;">▶ Assistir Cobertura</strong>
-                                </div>
-                            </div></div></div>
+            <div class="news-ticker-container" id="news-container"></div>
         </div>
     </div>
 
     <div id="noticia-modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); align-items: center; justify-content: center;">
         <div style="width: 90%; max-width: 500px; position: relative; background: #ffffff; padding: 20px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
             <button id="fechar-modal" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: #64748b; font-size: 24px; cursor: pointer;">×</button>
-            <h2 id="modal-titulo" style="color: #1e293b; margin-bottom: 5px; font-size: 1.2rem;"></h2>
-            <p id="modal-fonte" style="font-size: 0.8rem; color: #ef4444; font-weight: bold; text-transform: uppercase; margin-bottom: 15px;"></p>
-            <p id="modal-conteudo" style="color: #334155; font-size: 0.95rem; line-height: 1.5;"></p>
+            <h2 id="modal-titulo" style="color: #1e293b; margin-bottom: 5px; font-size: 1.2rem;">Notícia Completa</h2>
+            <p id="modal-conteudo" style="color: #334155; font-size: 1rem; line-height: 1.5; margin-top: 10px;"></p>
         </div>
     </div>
+    
+    <script>
+        document.getElementById('fechar-modal').addEventListener('click', function() {
+            document.getElementById('noticia-modal').style.display = 'none';
+            // Retoma o carrossel ao fechar o modal
+            if (window.$newsAPI && window.$newsAPI.startNewsCarousel) {
+                window.$newsAPI.startNewsCarousel('news-container');
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === document.getElementById('noticia-modal')) {
+                document.getElementById('noticia-modal').style.display = 'none';
+                // Retoma o carrossel ao fechar o modal
+                if (window.$newsAPI && window.$newsAPI.startNewsCarousel) {
+                    window.$newsAPI.startNewsCarousel('news-container');
+                }
+            }
+        });
+    </script>
 
     <script src="assets/leaflet.js"></script>
     <script src="assets/supabase.js"></script>
+    <script src="assets/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.$newsAPI) {
+                window.$newsAPI.startNewsCarousel('news-container');
+            }
+        });
+    </script>
+    <script src="assets/footer-news.js"></script>
 
     <script>
         // ==========================================
@@ -180,7 +226,15 @@
         // ==========================================
         // Chaves validadas e corrigidas
         const SUPABASE_URL = 'https://ecphyqttiffjwqnebolm.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'sb_publishable_k_w_cv7TrM7hv59fZQpsXw_3lKNd0CR'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjcGh5cXR0aWZmandxbmVib2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzM0NDgsImV4cCI6MjA5NTY0OTQ0OH0.ZiZnzsbWPR0zgBQBXR0mj3otQ5xe4uxxFxobZMW82BM'; 
+
+        // ==========================================
+        // 1b. VERIFICAÇÃO DE AMBIENTE
+        // ==========================================
+        // Detecta se está rodando localmente (file://) e avisa
+        if (window.location.protocol === 'file:') {
+            console.warn('⚠️ Rodando em modo local (file://). Algumas funcionalidades podem ser limitadas. Para melhor experiência, use um servidor local (ex: VS Code Live Server).');
+        }
 
         let _supabase = null;
         let usuarioLogado = null;
@@ -253,19 +307,27 @@
 
         async function executarAutenticacao() {
             if (!_supabase) { alert('Banco de dados offline.'); return; }
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.normalize("NFKC");
+            
             if(!email || !password) { alert('Preencha os campos!'); return; }
+            
             try {
                 if(modoAuthAtual === 'cadastro') {
                     const { error } = await _supabase.auth.signUp({ email, password });
                     if (error) throw error;
                     alert('Conta criada com sucesso!');
                 } else {
-                    const { error } = await _supabase.auth.signInWithPassword({ email, password });
+                    const { error } = await _supabase.auth.signInWithPassword({ 
+                        email, 
+                        password: password.normalize("NFKC") 
+                    });
                     if (error) throw error;
                 }
-            } catch (err) { alert('Erro: ' + err.message); }
+            } catch (err) { 
+                alert('Erro: ' + err.message);
+                console.error("Detalhes do erro:", err); 
+            }
         }
 
         async function fazerLogout() { 
@@ -482,14 +544,65 @@
         // ==========================================
         // 6. EXECUÇÃO INICIAL E CORREÇÃO DE ASPECTO
         // ==========================================
-        document.addEventListener('DOMContentLoaded', () => {
-            carregarHospitais();
-            carregarNoticias();
-
+        document.addEventListener('DOMContentLoaded', async () => {
             // Ajuste crucial: força o Leaflet a reajustar dimensões após a montagem do layout flexbox
             setTimeout(() => {
                 map.invalidateSize();
+                // Carrega os hospitais após garantir que o mapa está pronto
+                setTimeout(() => {
+                    carregarHospitais();
+                    // Força a atualização do mapa após adicionar os marcadores
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        // Garante que os marcadores sejam visíveis
+                        if (Object.keys(marcadoresMapa).length > 0) {
+                            const firstMarker = Object.values(marcadoresMapa)[0];
+                            map.setView(firstMarker.getLatLng(), 12);
+                        }
+                    }, 100);
+                }, 100);
             }, 300);
+
+            carregarNoticias();
+            
+        // Carrega e exibe todas as notícias em carrossel
+        try {
+            const { data: newsList, error } = await _supabase
+                .from('footer_news')
+                .select('*')
+                .order('created_at', { ascending: false });
+                
+            if (error) throw error;
+            
+            const container = document.getElementById('news-container');
+            container.innerHTML = '';
+            
+            if (newsList && newsList.length > 0) {
+                newsList.forEach(news => {
+                    const item = document.createElement('div');
+                    item.className = 'news-item';
+                    item.innerHTML = `<p class="news-text">${news.content}</p><span class="news-source">Fonte: Administração</span>`;
+                    container.appendChild(item);
+                });
+                
+                // Configura o carrossel
+                let currentIndex = 0;
+                const items = document.querySelectorAll('.news-item');
+                
+                function showNextNews() {
+                    items.forEach((item, index) => {
+                        item.style.display = index === currentIndex ? 'flex' : 'none';
+                    });
+                    currentIndex = (currentIndex + 1) % items.length;
+                }
+                
+                // Mostra a primeira notícia e inicia o carrossel
+                showNextNews();
+                setInterval(showNextNews, 5000); // Muda a cada 5 segundos
+            }
+        } catch (error) {
+            console.error('Erro ao carregar notícias:', error);
+        }
 
             document.getElementById('fechar-modal')?.addEventListener('click', () => {
                 document.getElementById('noticia-modal').style.display = 'none';
@@ -501,6 +614,82 @@
                 }
             });
         });
+
+        // ==========================================
+        // 7. PAINEL ADMINISTRATIVO
+        // ==========================================
+        function abrirPainelAdmin() {
+            if (!usuarioLogado) {
+                abrirAuthModal();
+                return;
+            }
+            
+            // Verifica se o usuário é admin (versão simplificada para teste)
+            try {
+                // Lista de e-mails administradores (temporário para testes)
+const admins = [
+    'admin@teste.com',
+    'seu_email@exemplo.com',
+    'teste@semaforo.com'
+];
+                
+                if (admins.includes(usuarioLogado.email)) {
+                    // Cria modal do painel admin
+                    const modal = document.createElement('div');
+                    modal.id = 'admin-modal';
+                    modal.style.position = 'fixed';
+                    modal.style.top = '0';
+                    modal.style.left = '0';
+                    modal.style.width = '100%';
+                    modal.style.height = '100%';
+                    modal.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                    modal.style.display = 'flex';
+                    modal.style.justifyContent = 'center';
+                    modal.style.alignItems = 'center';
+                    modal.style.zIndex = '3000';
+                    
+                    // Conteúdo do painel
+                    modal.innerHTML = `
+                        <div style="background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px;">
+                            <h2 style="margin-top: 0;">Painel Administrativo</h2>
+                            <button onclick="document.getElementById('admin-modal').remove()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer;">×</button>
+                            
+                            <div style="margin-top: 20px;">
+                                <h3>Atualizar Notícias</h3>
+                                <textarea id="admin-news-content" style="width: 100%; min-height: 100px; margin-bottom: 10px;" placeholder="Digite a notícia..."></textarea>
+                                <button onclick="salvarNoticiaAdmin()" style="background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Salvar Notícia</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(modal);
+                } else {
+                    alert('Acesso restrito a administradores');
+                }
+            } catch (err) {
+                console.error('Erro ao verificar admin:', err);
+                alert('Erro ao verificar permissões - Modo Teste');
+            }
+        }
+        
+        function salvarNoticiaAdmin() {
+            const content = document.getElementById('admin-news-content').value.trim();
+            if (!content) {
+                alert('Digite o conteúdo da notícia');
+                return;
+            }
+            
+            window.$newsAPI.saveNews(content)
+                .then(() => {
+                    alert('Notícia atualizada com sucesso!');
+                    document.getElementById('admin-news-content').value = '';
+                    location.reload(); // Atualiza para mostrar a nova notícia
+                })
+                .catch(err => {
+                    console.error('Erro ao salvar notícia:', err);
+                    alert('Erro ao salvar notícia');
+                });
+        }
     </script>
 
 </body></html>

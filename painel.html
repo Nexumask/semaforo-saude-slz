@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Notícias - Rodapé</title>
+    <script src="assets/supabase.js"></script>
+    <script src="assets/config.js"></script>
+    <script src="assets/footer-news.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --text-color: #1e293b;
+            --bg-color: #f8fafc;
+            --border-color: #e2e8f0;
+            --error-color: #dc2626;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 2rem;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        
+        h1 {
+            margin-top: 0;
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-family: inherit;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        
+        button[type="submit"] {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        
+        button[type="submit"]:hover {
+            background-color: #1d4ed8;
+        }
+        
+        .error {
+            color: var(--error-color);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Atualizar Notícia do Rodapé</h1>
+        <form id="newsForm">
+            <textarea id="newsContent" placeholder="Digite a notícia para o rodapé..." required></textarea>
+            <button type="submit">Publicar Notícia</button>
+        </form>
+    </div>
+    <script>
+        document.getElementById('newsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = document.getElementById('newsContent').value.trim();
+            
+            if (!content) {
+                alert('Por favor, digite o conteúdo da notícia');
+                return;
+            }
+            
+            try {
+                const result = await window.$newsAPI.saveNews(content);
+                if (result) {
+                    alert('Notícia atualizada com sucesso!');
+                    document.getElementById('newsContent').value = '';
+                }
+            } catch (error) {
+                console.error('Erro na publicação:', error);
+                alert(`Erro: ${error.message || 'Falha na publicação'}`);
+            }
+        });
+    </script>
+</body>
+</html>

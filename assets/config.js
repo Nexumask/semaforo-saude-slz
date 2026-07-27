@@ -1,0 +1,3 @@
+// Configurações do Supabase - Frontend
+window.SUPABASE_URL = 'https://ecphyqttiffjwqnebolm.supabase.co';
+window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjcGh5cXR0aWZmandxbmVib2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzM0NDgsImV4cCI6MjA5NTY0OTQ0OH0.ZiZnzsbWPR0zgBQBXR0mj3otQ5xe4uxxFxobZMW82BM';
