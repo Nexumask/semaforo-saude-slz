@@ -62,26 +62,48 @@ let carouselInterval;
             
             currentNewsIndex = 0;
             
-            const updateNewsDisplay = () => {
-                if (currentNewsList.length === 0) return;
+        const updateNewsDisplay = () => {
+            if (currentNewsList.length === 0) return;
+            
+            container.style.opacity = 0;
+            
+            setTimeout(() => {
+                const newsItem = document.createElement('div');
+                newsItem.style.display = 'flex';
+                newsItem.style.alignItems = 'center';
+                newsItem.style.gap = '10px';
+                newsItem.style.cursor = 'pointer';
+                newsItem.dataset.content = currentNewsList[currentNewsIndex].content;
+                newsItem.dataset.index = currentNewsIndex;
                 
-                container.style.opacity = 0;
+                // Extrai URL de imagem ou ID do YouTube do conteúdo
+                const content = currentNewsList[currentNewsIndex].content;
+                let thumbnailHtml = '';
                 
-                setTimeout(() => {
-                    const newsItem = document.createElement('div');
-                    newsItem.textContent = currentNewsList[currentNewsIndex].content;
-                    newsItem.style.cursor = 'pointer';
-                    newsItem.dataset.content = currentNewsList[currentNewsIndex].content;
-                    newsItem.dataset.index = currentNewsIndex;
-                    
-                    container.innerHTML = '';
-                    container.appendChild(newsItem);
-                    container.style.opacity = 1;
-                    
-                    console.log('[DEBUG] Texto mudou. Índice atual:', currentNewsIndex, 'Notícia:', currentNewsList[currentNewsIndex]?.content);
-                    
-                    currentNewsIndex = (currentNewsIndex + 1) % currentNewsList.length;
-                }, 500); // Tempo para a transição de fade-out
+                // Verifica se há URL do YouTube
+                const youtubeMatch = content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                // Verifica se há URL de imagem do Supabase
+                const supabaseMatch = content.match(/https?:\/\/[^\s]+\.supabase\.co[^\s]+\.(jpg|jpeg|png|gif)/i);
+                
+                if (youtubeMatch && youtubeMatch[1]) {
+                    thumbnailHtml = `<img src="https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">`;
+                } else if (supabaseMatch && supabaseMatch[0]) {
+                    thumbnailHtml = `<img src="${supabaseMatch[0]}" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">`;
+                } else {
+                    // Fallback: ícone padrão quando não há mídia
+                    thumbnailHtml = '<div style="width: 80px; height: 45px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; border-radius: 4px;">📰</div>';
+                }
+                
+                newsItem.innerHTML = `${thumbnailHtml}<div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${content}</div>`;
+                
+                container.innerHTML = '';
+                container.appendChild(newsItem);
+                container.style.opacity = 1;
+                
+                console.log('[DEBUG] Texto mudou. Índice atual:', currentNewsIndex, 'Notícia:', currentNewsList[currentNewsIndex]?.content);
+                
+                currentNewsIndex = (currentNewsIndex + 1) % currentNewsList.length;
+            }, 500); // Tempo para a transição de fade-out
             };
             
             // Delegation de evento para o container pai
@@ -101,7 +123,23 @@ let carouselInterval;
                         console.log('[DEBUG] Dados da notícia clicada:', activeNews, 'Índice:', clickedIndex);
                         
                         modalTitle.textContent = 'Notícia Completa';
-                        modalContent.textContent = activeNews.content || 'Conteúdo não disponível';
+                        
+                        // Extrai URL de imagem ou ID do YouTube do conteúdo
+                        const content = activeNews.content;
+                        let mediaHtml = '';
+                        
+                        // Verifica se há URL do YouTube
+                        const youtubeMatch = content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                        // Verifica se há URL de imagem do Supabase
+                        const supabaseMatch = content.match(/https?:\/\/[^\s]+\.supabase\.co[^\s]+\.(jpg|jpeg|png|gif)/i);
+                        
+                        if (youtubeMatch && youtubeMatch[1]) {
+                            mediaHtml = `<div style="margin-bottom: 15px;"><img src="https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px;"></div>`;
+                        } else if (supabaseMatch && supabaseMatch[0]) {
+                            mediaHtml = `<div style="margin-bottom: 15px;"><img src="${supabaseMatch[0]}" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px;"></div>`;
+                        }
+                        
+                        modalContent.innerHTML = `${mediaHtml}<p style="color: #334155; font-size: 1rem; line-height: 1.5;">${content || 'Conteúdo não disponível'}</p>`;
                         modal.style.display = 'flex';
                         clearInterval(carouselInterval);
                     } else {
