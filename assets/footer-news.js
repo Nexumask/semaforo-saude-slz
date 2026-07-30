@@ -20,6 +20,17 @@ let carouselInterval;
     );
 
     window.$newsAPI = {
+        stopNewsCarousel: function() {
+            if (carouselInterval) {
+                clearInterval(carouselInterval);
+                carouselInterval = null;
+            }
+            const container = document.getElementById('news-container');
+            if (container) {
+                container.replaceWith(container.cloneNode(true)); // Remove todos os event listeners
+            }
+        },
+
         saveNews: async function(content) {
             try {
                 const { data, error } = await supabaseClient
@@ -45,9 +56,9 @@ let carouselInterval;
                 
                 if (error) throw error;
                 return data || [];
-            } catch (error) {
-                console.error('Erro ao buscar notícias:', error);
-                throw error;
+            } catch (err) {
+                console.error('Erro na chamada ao Supabase:', err);
+                return [];
             }
         },
         
