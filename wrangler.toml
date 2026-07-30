@@ -1,7 +1,2 @@
 name = "semaforo-saude-slz"
-compatibility_date = "2026-07-30"
-
-[pages]
-  bucket = "."
-  include = ["*/*"]
-  exclude = ["node_modules"]
+pages_build_output_dir = "."
