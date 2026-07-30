@@ -62,12 +62,13 @@ let carouselInterval;
             
             currentNewsIndex = 0;
             
-        const updateNewsDisplay = () => {
-            if (currentNewsList.length === 0) return;
+const updateNewsDisplay = () => {
+            if (!currentNewsList || currentNewsList.length === 0) return;
             
             container.style.opacity = 0;
             
             setTimeout(() => {
+                if (!container) return;
                 const newsItem = document.createElement('div');
                 newsItem.style.display = 'flex';
                 newsItem.style.alignItems = 'center';
