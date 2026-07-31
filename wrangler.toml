@@ -1,2 +1,18 @@
 name = "semaforo-saude-slz"
-pages_build_output_dir = "."
+main = "index.html"
+compatibility_date = "2026-07-30"
+
+[build]
+command = "npm run build"
+watch_directories = ["src"]
+
+[env]
+SUPABASE_URL = "https://ecphyqttiffjwqnebolm.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjcGh5cXR0aWZmandxbmVib2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzM0NDgsImV4cCI6MjA5NTY0OTQ0OH0.ZiZnzsbWPR0zgBQBXR0mj3otQ5xe4uxxFxobZMW82BM"
+
+[vars]
+ENVIRONMENT = "production"
+
+[site]
+bucket = "."
+entry-point = "workers-site"
