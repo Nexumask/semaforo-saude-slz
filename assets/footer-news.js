@@ -130,7 +130,8 @@ const updateNewsDisplay = () => {
                     const modalTitle = document.getElementById('modal-titulo');
                     
                     if (modal && modalContent && modalTitle) {
-                        const clickedIndex = parseInt(e.currentTarget.firstChild.dataset.index);
+                        const clickedItem = e.target.closest('.news-item') || e.currentTarget.firstChild;
+                        const clickedIndex = parseInt(clickedItem.dataset.index);
                         const activeNews = currentNewsList[clickedIndex];
                         console.log('[DEBUG] Dados da notícia clicada:', activeNews, 'Índice:', clickedIndex);
                         
