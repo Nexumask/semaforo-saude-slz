@@ -176,9 +176,59 @@ const updateNewsDisplay = () => {
                         return;
                     }
                     
-                    updateNewsDisplay();
-                    carouselInterval = setInterval(updateNewsDisplay, interval);
-                    console.log('[DEBUG] Carrossel iniciado com sucesso');
+            // Configura transição horizontal
+            container.style.display = 'flex';
+            container.style.overflow = 'hidden';
+            container.style.gap = '10px';
+            container.style.scrollBehavior = 'smooth';
+            
+            // Prepara todos os itens visíveis
+            currentNewsList.forEach((news, index) => {
+                const newsItem = document.createElement('div');
+                newsItem.style.minWidth = '100%';
+                newsItem.style.flexShrink = '0';
+                newsItem.style.padding = '8px';
+                newsItem.style.display = 'flex';
+                newsItem.style.alignItems = 'center';
+                newsItem.style.gap = '10px';
+                newsItem.dataset.content = news.content;
+                newsItem.dataset.index = index;
+                
+                // Extrai URL de imagem ou ID do YouTube do conteúdo
+                const content = news.content;
+                let thumbnailHtml = '';
+                
+                // Verifica se há URL do YouTube
+                const youtubeMatch = content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                // Verifica se há URL de imagem do Supabase
+                const supabaseMatch = content.match(/https?:\/\/[^\s]+\.supabase\.co[^\s]+\.(jpg|jpeg|png|gif)/i);
+                
+                if (youtubeMatch && youtubeMatch[1]) {
+                    thumbnailHtml = `<img src="https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">`;
+                } else if (supabaseMatch && supabaseMatch[0]) {
+                    thumbnailHtml = `<img src="${supabaseMatch[0]}" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">`;
+                } else {
+                    // Fallback: ícone padrão quando não há mídia
+                    thumbnailHtml = '<div style="width: 80px; height: 45px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; border-radius: 4px;">📰</div>';
+                }
+                
+                newsItem.innerHTML = `${thumbnailHtml}<div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${content}</div>`;
+                container.appendChild(newsItem);
+            });
+            
+            let scrollPosition = 0;
+            const scrollNews = () => {
+                scrollPosition += container.clientWidth;
+                if (scrollPosition >= container.scrollWidth) {
+                    scrollPosition = 0;
+                    container.scrollTo({ left: 0, behavior: 'instant' });
+                } else {
+                    container.scrollTo({ left: scrollPosition, behavior: 'smooth' });
+                }
+            };
+            
+            carouselInterval = setInterval(scrollNews, interval);
+            console.log('[DEBUG] Carrossel horizontal iniciado com sucesso');
                 } catch (error) {
                     console.error('Erro ao iniciar carrossel:', error);
                 }
