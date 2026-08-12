@@ -1,21 +1,45 @@
-// Configuração inicial do Supabase - versão modular segura
+// footer-news.js - Módulo de notícias do rodapé (carrossel)
 let currentNewsList = [];
 let currentNewsIndex = 0;
 let carouselInterval = null;
 
 (function() {
     function getClient() {
-        if (typeof window.supabase !== 'undefined') {
-            const url = window.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
-            const key = window.SUPABASE_KEY || localStorage.getItem('SUPABASE_KEY') || '';
-            if (url && key) {
-                return window.supabase.createClient(url, key);
-            }
+        // Reutiliza o cliente global já inicializado no index.html
+        if (window._supabase) return window._supabase;
+        
+        // Fallback apenas se o SDK estiver disponível e credenciais existirem
+        if (typeof window.supabase !== 'undefined' && window.SUPABASE_URL && window.SUPABASE_KEY) {
+            return window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
         }
         return null;
     }
 
+    async function verificarAdmin() {
+        const client = getClient();
+        if (!client) throw new Error('Cliente Supabase não configurado');
+
+        const { data: { session } } = await client.auth.getSession();
+        const user = session ? session.user : null;
+
+        if (!user) {
+            // Fallback para módulo auth.js (se configurado)
+            const fallbackUser = window.auth ? window.auth.getUsuarioLogado() : null;
+            if (!fallbackUser) throw new Error('Acesso restrito a administradores');
+            
+            const admins = ['admin@teste.com', 'seu_email@exemplo.com', 'teste@semaforo.com'];
+            if (!admins.includes(fallbackUser.email)) throw new Error('Acesso restrito a administradores');
+            return true;
+        }
+        
+        const admins = ['admin@teste.com', 'seu_email@exemplo.com', 'teste@semaforo.com'];
+        if (!admins.includes(user.email)) throw new Error('Acesso restrito a administradores');
+        return true;
+    }
+
     window.$newsAPI = {
+        verificarAdmin: verificarAdmin,
+
         stopNewsCarousel: function() {
             if (carouselInterval) {
                 clearInterval(carouselInterval);
@@ -23,13 +47,21 @@ let carouselInterval = null;
             }
         },
 
-        saveNews: async function(content) {
+        saveNews: async function(content, urlVideo = null) {
             try {
+                await verificarAdmin();
                 const client = getClient();
                 if (!client) throw new Error('Cliente Supabase não configurado');
+
+                // Concatena o link ao content para que o carrossel detecte o YouTube/imagem
+                let textoFinal = content;
+                if (urlVideo && urlVideo.trim()) {
+                    textoFinal = `${content} ${urlVideo.trim()}`;
+                }
+
                 const { data, error } = await client
                     .from('footer_news')
-                    .insert([{ content }])
+                    .insert([{ content: textoFinal }])
                     .select();
                 
                 if (error) throw error;
@@ -40,19 +72,50 @@ let carouselInterval = null;
             }
         },
 
-        updateNews: async function(id, content, table = 'footer_news') {
+        updateNews: async function(id, content, table = 'footer_news', urlVideo = null) {
             try {
-                const client = getClient();
-                if (!client) throw new Error('Cliente Supabase não configurado');
-                const fieldName = table === 'noticias' ? 'conteudo' : 'content';
-                const { data, error } = await client
-                    .from(table)
-                    .update({ [fieldName]: content })
-                    .eq('id', id)
-                    .select();
+                await verificarAdmin();
 
-                if (error) throw error;
-                return data;
+                // Para footer_news (Rodapé) não existe coluna url_video.
+                // Concatena o link no final do content para que o carrossel detecte o YouTube/imagem.
+                let textoFinal = content;
+                if (table === 'footer_news' && urlVideo && urlVideo.trim()) {
+                    textoFinal = `${content} ${urlVideo.trim()}`;
+                }
+
+                const fieldName = table === 'noticias' ? 'conteudo' : 'content';
+                const updateData = { [fieldName]: textoFinal };
+                if (table === 'noticias' && urlVideo !== null) {
+                    updateData.url_video = urlVideo;
+                }
+
+                // Obtém token de sessão autenticada (não o anon key)
+                const client = getClient();
+                let token = window.SUPABASE_KEY;
+                if (client) {
+                    const { data: { session } } = await client.auth.getSession();
+                    if (session && session.access_token) {
+                        token = session.access_token;
+                    }
+                }
+
+                // PATCH direto ao endpoint REST do Supabase — controle explícito do método HTTP
+                const res = await fetch(`${window.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'apikey': window.SUPABASE_KEY,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text().catch(() => '');
+                    throw new Error(`Falha na atualização (HTTP ${res.status})${errText ? `: ${errText}` : ''}`);
+                }
+                return await res.json();
             } catch (error) {
                 console.error('Erro ao atualizar notícia:', error);
                 throw error;
@@ -61,14 +124,39 @@ let carouselInterval = null;
 
         deleteNews: async function(id, table = 'footer_news') {
             try {
-                const client = getClient();
-                if (!client) throw new Error('Cliente Supabase não configurado');
-                const { data, error } = await client
-                    .from(table)
-                    .delete()
-                    .eq('id', id);
+                await verificarAdmin();
 
-                if (error) throw error;
+                const client = getClient();
+                let token = window.SUPABASE_KEY;
+                if (client) {
+                    const { data: { session } } = await client.auth.getSession();
+                    if (session && session.access_token) {
+                        token = session.access_token;
+                    }
+                }
+
+                // DELETE direto ao endpoint REST do Supabase com token de sessão autenticada.
+                // O SDK pode aplicar o anon key se não houver sessão, e se a RLS policy
+                // não permitir DELETE anônimo, ele retorna sucesso sem apagar nada.
+                const res = await fetch(`${window.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'apikey': window.SUPABASE_KEY,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                    }
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text().catch(() => '');
+                    throw new Error(`Falha na exclusão (HTTP ${res.status})${errText ? `: ${errText}` : ''}`);
+                }
+
+                const data = await res.json().catch(() => []);
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('Nenhum registro foi excluído. Verifique se a RLS policy permite exclusão.');
+                }
                 return data;
             } catch (error) {
                 console.error('Erro ao deletar notícia:', error);
@@ -78,42 +166,25 @@ let carouselInterval = null;
 
         getAllNewsForAdmin: async function() {
             try {
+                await verificarAdmin();
                 const client = getClient();
-                if (!client) {
-                    const url = window.SUPABASE_URL || 'https://ecphyqttiffjwqnebolm.supabase.co';
-                    const key = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjcGh5cXR0aWZmandxbmVib2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzM0NDgsImV4cCI6MjA5NTY0OTQ0OH0.ZiZnzsbWPR0zgBQBXR0mj3otQ5xe4uxxFxobZMW82BM';
-                    
-                    const [resFooter, resNoticias] = await Promise.allSettled([
-                        fetch(`${url}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc`, { headers: { apikey: key, Authorization: `Bearer ${key}` } }).then(r => r.json()),
-                        fetch(`${url}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc`, { headers: { apikey: key, Authorization: `Bearer ${key}` } }).then(r => r.json())
-                    ]);
-
-                    let items = [];
-                    if (resFooter.status === 'fulfilled' && Array.isArray(resFooter.value)) {
-                        resFooter.value.forEach(item => {
-                            items.push({ id: item.id, content: item.content, created_at: item.created_at, table: 'footer_news' });
-                        });
-                    }
-                    if (resNoticias.status === 'fulfilled' && Array.isArray(resNoticias.value)) {
-                        resNoticias.value.forEach(item => {
-                            items.push({ id: item.id, content: item.conteudo || item.titulo, created_at: item.criado_em, table: 'noticias' });
-                        });
-                    }
-                    items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    return items;
-                }
+                if (!client) throw new Error('Cliente Supabase não configurado');
 
                 const [resFooter, resNoticias] = await Promise.allSettled([
                     client.from('footer_news').select('id, content, created_at').order('created_at', { ascending: false }),
-                    client.from('noticias').select('id, titulo, conteudo, criado_em').order('criado_em', { ascending: false })
+                    client.from('noticias').select('id, titulo, conteudo, fonte, url_video, criado_em').order('criado_em', { ascending: false })
                 ]);
 
                 let items = [];
                 if (resFooter.status === 'fulfilled' && resFooter.value.data) {
-                    resFooter.value.data.forEach(item => items.push({ id: item.id, content: item.content, created_at: item.created_at, table: 'footer_news' }));
+                    resFooter.value.data.forEach(item => {
+                        // Extrai URL (YouTube/imagem) do content para preencher o campo de vídeo na edição
+                        const urlExtraido = (item.content || '').match(/https?:\/\/\S+/i);
+                        items.push({ id: item.id, content: item.content, created_at: item.created_at, table: 'footer_news', url_video: urlExtraido ? urlExtraido[0] : '' });
+                    });
                 }
                 if (resNoticias.status === 'fulfilled' && resNoticias.value.data) {
-                    resNoticias.value.data.forEach(item => items.push({ id: item.id, content: item.conteudo || item.titulo, created_at: item.criado_em, table: 'noticias' }));
+                    resNoticias.value.data.forEach(item => items.push({ id: item.id, content: item.conteudo || item.titulo, created_at: item.criado_em, table: 'noticias', fonte: item.fonte, url_video: item.url_video }));
                 }
                 items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 return items;
@@ -126,45 +197,7 @@ let carouselInterval = null;
         getLatestNews: async function() {
             try {
                 const client = getClient();
-                if (!client) {
-                    // Fallback se cliente Supabase ainda não inicializado via SDK de script estático
-                    const url = window.SUPABASE_URL || 'https://ecphyqttiffjwqnebolm.supabase.co';
-                    const key = window.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjcGh5cXR0aWZmandxbmVib2xtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzM0NDgsImV4cCI6MjA5NTY0OTQ0OH0.ZiZnzsbWPR0zgBQBXR0mj3otQ5xe4uxxFxobZMW82BM';
-                    
-                    const [resFooter, resNoticias] = await Promise.allSettled([
-                        fetch(`${url}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&limit=5`, { headers: { apikey: key, Authorization: `Bearer ${key}` } }).then(r => r.json()),
-                        fetch(`${url}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&limit=5`, { headers: { apikey: key, Authorization: `Bearer ${key}` } }).then(r => r.json())
-                    ]);
-
-                    let items = [];
-                    if (resFooter.status === 'fulfilled' && Array.isArray(resFooter.value)) {
-                        resFooter.value.forEach(item => {
-                            items.push({
-                                id: item.id,
-                                titulo: 'Plantão Informativo',
-                                content: item.content,
-                                fonte: 'Administração',
-                                created_at: item.created_at
-                            });
-                        });
-                    }
-
-                    if (resNoticias.status === 'fulfilled' && Array.isArray(resNoticias.value)) {
-                        resNoticias.value.forEach(item => {
-                            items.push({
-                                id: item.id,
-                                titulo: item.titulo,
-                                content: item.conteudo ? `${item.titulo}: ${item.conteudo}` : item.titulo,
-                                fonte: item.fonte || 'Saúde São Luís',
-                                url_video: item.url_video,
-                                created_at: item.criado_em
-                            });
-                        });
-                    }
-
-                    items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    return items.slice(0, 10);
-                }
+                if (!client) throw new Error('Cliente Supabase não configurado');
 
                 // Busca via SDK Supabase
                 const [resFooter, resNoticias] = await Promise.allSettled([
@@ -243,14 +276,39 @@ let carouselInterval = null;
                     const youtubeMatch = fullText.match(/(?:v=|embed\/|youtu\.be\/|watch\?v=)([a-zA-Z0-9_-]{11})/);
                     const supabaseMatch = fullText.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
                     
+                    // Extrai a URL do texto (se houver) para exibir como link separado
+                    const urlMatch = fullText.match(/https?:\/\/\S+/i);
+                    const linkExtra = urlMatch && urlMatch[0] ? `<p style="margin-top: 12px;"><a href="${urlMatch[0]}" target="_blank" rel="noopener" style="color: #2563eb; text-decoration: underline; word-break: break-all; font-size: 0.85rem;">🔗 Abrir link externo</a></p>` : '';
+                    
+                    // Remove URL do texto visível
+                    const textoLimpo = (activeNews.content || 'Sem mais detalhes informados.').replace(/https?:\/\/\S+/g, '').trim() || 'Sem mais detalhes informados.';
+                    
                     if (youtubeMatch && youtubeMatch[1]) {
-                        mediaHtml = `<div style="margin-bottom: 15px;"><iframe width="100%" height="220" src="https://www.youtube.com/embed/${youtubeMatch[1]}" frameborder="0" allowfullscreen style="border-radius:12px;"></iframe></div>`;
+                        // Lazy-load: thumbnail clicável que só carrega o iframe sob demanda.
+                        // Evita disparo dos scripts de ads do YouTube (doubleclick) e o erro de CORS no console.
+                        const videoId = youtubeMatch[1];
+                        mediaHtml = `
+                            <div class="yt-lazy" data-video-id="${videoId}" style="margin-bottom: 15px; position: relative; cursor: pointer;">
+                                <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; display: block;">
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 68px; height: 48px; background: rgba(0,0,0,0.75); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                    <svg width="34" height="34" viewBox="0 0 24 24" fill="#ffffff"><path d="M8 5v14l11-7z"/></svg>
+                                </div>
+                            </div>`;
                     } else if (supabaseMatch && supabaseMatch[0]) {
                         mediaHtml = `<div style="margin-bottom: 15px;"><img src="${supabaseMatch[0]}" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px;"></div>`;
                     }
                     
                     if (modalContent) {
-                        modalContent.innerHTML = `${mediaHtml}<p style="color: #334155; font-size: 1rem; line-height: 1.5; margin-top: 10px;">${activeNews.content || 'Sem mais detalhes informados.'}</p>`;
+                        modalContent.innerHTML = `${mediaHtml}<p style="color: #334155; font-size: 1rem; line-height: 1.5; margin-top: 10px;">${textoLimpo}</p>${linkExtra}`;
+
+                        // Delegação: clicar na thumbnail troca pelo iframe do YouTube sob demanda
+                        const ytLazy = modalContent.querySelector('.yt-lazy');
+                        if (ytLazy) {
+                            ytLazy.addEventListener('click', function() {
+                                const vid = this.dataset.videoId;
+                                this.innerHTML = `<iframe width="100%" height="220" src="https://www.youtube.com/embed/${vid}?autoplay=1" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="border-radius:12px; display:block;"></iframe>`;
+                            });
+                        }
                     }
                     
                     if (modal) modal.style.display = 'flex';
@@ -288,12 +346,15 @@ let carouselInterval = null;
                             } else {
                                 thumbnailHtml = `<div style="width: 45px; height: 45px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; border-radius: 6px; flex-shrink: 0; font-size: 1.2rem;">📰</div>`;
                             }
+
+                            // Remove URL (http/https) do texto visível para não poluir o card
+                            const exibirTexto = (news.content || news.titulo || '').replace(/https?:\/\/\S+/g, '').trim() || 'Clique para ver a notícia completa';
                             
                             newsItem.innerHTML = `
                                 <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
                                     ${thumbnailHtml}
                                     <div style="flex: 1; overflow: hidden;">
-                                        <p class="news-text" style="font-size: 0.85rem; font-weight: 600; color: #1e293b; margin: 0; line-clamp: 2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${news.content || news.titulo}</p>
+                                        <p class="news-text" style="font-size: 0.85rem; font-weight: 600; color: #1e293b; margin: 0; line-clamp: 2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${exibirTexto}</p>
                                         <span class="news-source" style="font-size: 0.7rem; color: #64748b;">Fonte: ${news.fonte || 'Geral'}</span>
                                     </div>
                                 </div>
@@ -319,7 +380,10 @@ let carouselInterval = null;
                     }
                 };
 
-                fetchAndRender();
+                fetchAndRender().catch(err => {
+                    console.error('Erro ao carregar notícias do carrossel:', err);
+                    container.innerHTML = '<div class="news-item"><p class="news-text">Erro ao carregar notícias.</p></div>';
+                });
                 return true;
             };
 
@@ -329,7 +393,7 @@ let carouselInterval = null;
         }
     };
 
-    // Tenta autoinicializar se o container já existir na página
+    // Autoinicializa o carrossel se o container existir na página
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(() => {
             if (document.getElementById('news-container')) {
