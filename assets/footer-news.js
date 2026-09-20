@@ -584,13 +584,36 @@ let carouselInterval = null;
 
                 manuales.sort(compararPorFecha);
                 automaticas.sort(compararPorFecha);
+                // FIX PIN ABSOLUTO: o post institucional de boas-vindas
+                // ("Conheça o Semáforo da Saúde...") fica SEMPRE cravado no
+                // índice 0 do carrossel, aconteça o que aconteça com as datas.
+                // As demais postagens manuais (footer_news) seguem na sequência
+                // (índices 1, 2...) e o RSS só preenche os slots até 10.
+                const normalizarTexto = (s) => {
+                    const t = String(s || '').toLowerCase();
+                    return typeof t.normalize === 'function'
+                        ? t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        : t;
+                };
+                // Marcador de boas-vindas em forma NORMALIZADA (sem acentos/
+                // cedilla): "Conheça o Semáforo da Saúde..." → "conheca o
+                // semaforo da salud".
+                const MARCA_BOAS_VENIDAS = 'conheca o semaforo da salud';
+                const esBoasVendidas = (n) => normalizarTexto(n.content).includes(MARCA_BOAS_VENIDAS);
+
+                const boasVendidas = [];
+                const demaisManuais = [];
+                manuales.forEach(n => {
+                    (esBoasVendidas(n) ? boasVendidas : demaisManuais).push(n);
+                });
+                const manualesOrdenados = boasVendidas.concat(demaisManuais);
 
                 // Dedupe por conteúdo: se o texto já é visível como manual, a
                 // noticia RSS duplicada se descarta (nunca ao revés).
                 const textosVisibles = new Set();
-                manuales.slice(0, 10).forEach(n => textosVisibles.add(String(n.content).trim()));
+                manualesOrdenados.slice(0, 10).forEach(n => textosVisibles.add(String(n.content).trim()));
 
-                const mezcladas = manuales.slice(0, 10);
+                const mezcladas = manualesOrdenados.slice(0, 10);
                 for (const item of automaticas) {
                     if (mezcladas.length >= 10) break;
                     const clave = String(item.content || '').trim();
