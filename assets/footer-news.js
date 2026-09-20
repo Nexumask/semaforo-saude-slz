@@ -270,6 +270,39 @@ let carouselInterval = null;
         return true;
     }
 
+    // ------------------------------------------------------------------
+    // LEITURA ANTI-CACHE DO SUPABASE (fetch REST nativo)
+    // ------------------------------------------------------------------
+    // O PWA estava mantendo respostas da API do Supabase no cache local,
+    // impedindo o usuário de ver as notícias atualizadas do cron sem
+    // limpar o cache do navegador. Toda LEITURA deste módulo passa por
+    // `lerSupabaseAntiCache()`, que usa:
+    //   - `cache: 'no-store'`        -> proíbe o navegador de reutilizar
+    //   - `&_t=${Date.now()}`        -> cache-busting (URL sempre inédita)
+    // Assim a requisição traz SEMPRE o estado em tempo real do banco.
+    function cabecalhosSupabase() {
+        return {
+            'apikey': window.SUPABASE_KEY,
+            'Authorization': 'Bearer ' + window.SUPABASE_KEY,
+            'Accept': 'application/json'
+        };
+    }
+
+    // GET anti-cache ao endpoint REST do Supabase. Retorna o objeto
+    // `{ data }` no mesmo formato do cliente supabase-js, permitindo
+    // reaproveitar o Promise.allSettled + `.value.data` já existente.
+    async function lerSupabaseAntiCache(url) {
+        const res = await fetch(url, {
+            cache: 'no-store',
+            headers: cabecalhosSupabase()
+        });
+        if (!res.ok) {
+            throw new Error('Supabase HTTP ' + res.status);
+        }
+        const json = await res.json();
+        return { data: Array.isArray(json) ? json : (json || []) };
+    }
+
     window.$newsAPI = {
         verificarAdmin: verificarAdmin,
 
@@ -349,6 +382,7 @@ let carouselInterval = null;
                 // PATCH direto ao endpoint REST do Supabase — controle explícito do método HTTP
                 const res = await fetch(`${window.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
                     method: 'PATCH',
+                    cache: 'no-store',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'apikey': window.SUPABASE_KEY,
@@ -435,8 +469,8 @@ let carouselInterval = null;
                 if (!client) throw new Error('Cliente Supabase não configurado');
 
                 const [resFooter, resNoticias] = await Promise.allSettled([
-                    client.from('footer_news').select('id, content, created_at').order('created_at', { ascending: false }),
-                    client.from('noticias').select('id, titulo, conteudo, fonte, url_video, criado_em').order('criado_em', { ascending: false })
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&_t=${Date.now()}`),
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&_t=${Date.now()}`)
                 ]);
 
                 let items = [];
@@ -473,11 +507,18 @@ let carouselInterval = null;
                 //
                 // AGORA: as publicações manuais (footer_news) têm PRIORIDADE MÁXIMA
                 // e NUNCA são descartadas; as noticias RSS apenas preenchem os
-                // slots restantes (até 10). Sort à prova de NULL/datas inválidas.
+                // slots restantes (até 10). O RSS NUNCA ultrapassa uma postagem
+                // manual no índice do carrossel (pinning absoluto). Sort à prova
+                // de NULL/datas inválidas.
+                //
+                // ANTI-STALE CACHE: leitura via fetch REST nativo com
+                // `cache: 'no-store'` e `&_t=${Date.now()}` de cache-busting —
+                // o PWA/SW não pode entregar resposta antiga da API depois que
+                // o cron (buscar-noticias-saude) grava novas notícias.
                 // -------------------------------------------------------------------
                 const [resFooter, resNoticias] = await Promise.allSettled([
-                    client.from('footer_news').select('id, content, created_at').order('created_at', { ascending: false }).limit(20),
-                    client.from('noticias').select('id, titulo, conteudo, fonte, url_video, criado_em').order('criado_em', { ascending: false }).limit(20)
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&limit=20&_t=${Date.now()}`),
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&limit=20&_t=${Date.now()}`)
                 ]);
 
                 // Comparador seguro: datas nulas/inválidas vão ao fundo (0) em vez
