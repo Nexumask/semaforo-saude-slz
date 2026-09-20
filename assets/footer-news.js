@@ -291,12 +291,32 @@ let carouselInterval = null;
     // GET anti-cache ao endpoint REST do Supabase. Retorna o objeto
     // `{ data }` no mesmo formato do cliente supabase-js, permitindo
     // reaproveitar o Promise.allSettled + `.value.data` já existente.
-    async function lerSupabaseAntiCache(url) {
-        const res = await fetch(url, {
-            cache: 'no-store',
-            headers: cabecalhosSupabase()
-        });
+    // `rotulo` identifica a tabela consultada ('footer_news' | 'noticias')
+    // para os logs de erro abaixo (status 400/401/500, falha de rede/CORS).
+    async function lerSupabaseAntiCache(url, rotulo) {
+        let res;
+        try {
+            res = await fetch(url, {
+                cache: 'no-store',
+                headers: cabecalhosSupabase()
+            });
+        } catch (err) {
+            // Falha de rede / CORS: log por tabela para diagnóstico no DevTools.
+            if (rotulo === 'noticias') {
+                console.error('Erro noticias:', err);
+            } else {
+                console.error('Erro footer_news:', err);
+            }
+            throw err;
+        }
         if (!res.ok) {
+            // Respostas 400/401/500 (ex.: RLS, coluna inexistente, chave inválida)
+            // são capturadas e exibidas identificando a tabela que falhou.
+            if (rotulo === 'noticias') {
+                console.error('Erro noticias:', 'Supabase HTTP ' + res.status, url);
+            } else {
+                console.error('Erro footer_news:', 'Supabase HTTP ' + res.status, url);
+            }
             throw new Error('Supabase HTTP ' + res.status);
         }
         const json = await res.json();
@@ -469,8 +489,8 @@ let carouselInterval = null;
                 if (!client) throw new Error('Cliente Supabase não configurado');
 
                 const [resFooter, resNoticias] = await Promise.allSettled([
-                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&_t=${Date.now()}`),
-                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&_t=${Date.now()}`)
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&_t=${Date.now()}`, 'footer_news'),
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&_t=${Date.now()}`, 'noticias')
                 ]);
 
                 let items = [];
@@ -517,8 +537,8 @@ let carouselInterval = null;
                 // o cron (buscar-noticias-saude) grava novas notícias.
                 // -------------------------------------------------------------------
                 const [resFooter, resNoticias] = await Promise.allSettled([
-                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&limit=20&_t=${Date.now()}`),
-                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&limit=20&_t=${Date.now()}`)
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/footer_news?select=id,content,created_at&order=created_at.desc&limit=20&_t=${Date.now()}`, 'footer_news'),
+                    lerSupabaseAntiCache(`${window.SUPABASE_URL}/rest/v1/noticias?select=id,titulo,conteudo,fonte,url_video,criado_em&order=criado_em.desc&limit=20&_t=${Date.now()}`, 'noticias')
                 ]);
 
                 // Comparador seguro: datas nulas/inválidas vão ao fundo (0) em vez
