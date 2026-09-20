@@ -6,7 +6,7 @@
  * - em caso de falha de rede, serve o cache e, como último recurso,
  *   o index.html (para navegações).
  */
-const CACHE_NAME = 'semaforo-saude-v2';
+const CACHE_NAME = 'semaforo-saude-v3';
 
 // Conjunto mínimo do "casca" da aplicação, pré-cacheado na instalação.
 const APP_SHELL = [

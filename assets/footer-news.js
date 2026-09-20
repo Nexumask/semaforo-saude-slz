@@ -597,9 +597,14 @@ let carouselInterval = null;
                 };
                 // Marcador de boas-vindas em forma NORMALIZADA (sem acentos/
                 // cedilla): "Conheça o Semáforo da Saúde..." → "conheca o
-                // semaforo da salud".
-                const MARCA_BOAS_VENIDAS = 'conheca o semaforo da salud';
-                const esBoasVendidas = (n) => normalizarTexto(n.content).includes(MARCA_BOAS_VENIDAS);
+                // semaforo da saude". Busca por palavras-chave ("conheca" E
+                // "semaforo") em vez da frase exata — cobre variações do
+                // texto institucional e NÃO depende de "salud" (espanhol).
+                const PALAVRAS_BOAS_VENDAS = ['conheca', 'semaforo'];
+                const esBoasVendidas = (n) => {
+                    const texto = normalizarTexto(n.content);
+                    return PALAVRAS_BOAS_VENDAS.every(palavra => texto.includes(palavra));
+                };
 
                 const boasVendidas = [];
                 const demaisManuais = [];
